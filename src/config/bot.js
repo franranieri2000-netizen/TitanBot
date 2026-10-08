@@ -649,3 +649,168 @@ export function getRandomColor() {
 }
 
 export default botConfig;
+const { Client, GatewayIntentBits, Partials, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
+const fs = require('fs');
+const path = require('path');
+
+const client = new Client({
+    intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent,
+        GatewayIntentBits.GuildMembers
+    ],
+    partials: [Partials.Message, Partials.Channel, Partials.GuildMember]
+});
+
+const PREFIX = ','; // same as Bleed
+const OWNER_IDS = ['YOUR_DISCORD_ID_HERE']; // put your Discord user ID
+const WHITELIST_FILE = path.join(__dirname, 'whitelist.json');
+
+// Load whitelist
+let whitelist = [];
+if (fs.existsSync(WHITELIST_FILE)) {
+    whitelist = JSON.parse(fs.readFileSync(WHITELIST_FILE, 'utf8'));
+} else {
+    fs.writeFileSync(WHITELIST_FILE, JSON.stringify([], null, 2));
+}
+
+function saveWhitelist() {
+    fs.writeFileSync(WHITELIST_FILE, JSON.stringify(whitelist, null, 2));
+}
+
+function isOwner(userId) {
+    return OWNER_IDS.includes(userId);
+}
+
+function isWhitelisted(userId) {
+    return whitelist.includes(userId) || isOwner(userId);
+}
+
+client.once('ready', () => {
+    console.log(`Logged in as ${client.user.tag}`);
+    client.user.setActivity('Da Hood Crew | ,help', { type: 3 });
+});
+
+client.on('messageCreate', async (message) => {
+    if (message.author.bot || !message.content.startsWith(PREFIX)) return;
+
+    const args = message.content.slice(PREFIX.length).trim().split(/ +/);
+    const command = args.shift().toLowerCase();
+
+    // ========== HELP ==========
+    if (command === 'help') {
+        const embed = new EmbedBuilder()
+            .setColor(0x2b2d31)
+            .setTitle('Da Hood Crew Commands')
+            .setDescription('Prefix: `,`')
+            .addFields(
+                { name: 'snap', value: 'Snap a user (fun/roleplay)' },
+                { name: 'snap2', value: 'Alternative snap variation' },
+                { name: 'whitelist @user / userid', value: 'Add user to whitelist' },
+                { name: 'unwhitelist @user / userid', value: 'Remove from whitelist' },
+                { name: 'vanish', value: 'Make the bot go silent / "vanish"' },
+                { name: 'list', value: 'Show current whitelist' }
+            )
+            .setFooter({ text: 'Crew only' });
+        return message.reply({ embeds: [embed] });
+    }
+
+    // ========== SNAP ==========
+    if (command === 'snap') {
+        const target = message.mentions.users.first() || args[0];
+        if (!target) return message.reply('Usage: `,snap @user` or `,snap username`');
+
+        const name = typeof target === 'string' ? target : target.username;
+        const embed = new EmbedBuilder()
+            .setColor(0xff0000)
+            .setDescription(`**${message.author.username}** snapped **${name}**\n*The streets don't forget.*`);
+        return message.reply({ embeds: [embed] });
+    }
+
+    // ========== SNAP2 ==========
+    if (command === 'snap2') {
+        const target = message.mentions.users.first() || args[0];
+        if (!target) return message.reply('Usage: `,snap2 @user`');
+
+        const name = typeof target === 'string' ? target : target.username;
+        const embed = new EmbedBuilder()
+            .setColor(0x8b0000)
+            .setDescription(`**${message.author.username}** used **Snap 2** on **${name}**\n*Double the pressure.*`);
+        return message.reply({ embeds: [embed] });
+    }
+
+    // ========== WHITELIST ==========
+    if (command === 'whitelist') {
+        if (!isOwner(message.author.id)) {
+            return message.reply('Only the owner can manage the whitelist.');
+        }
+
+        const target = message.mentions.users.first() || args[0];
+        if (!target) return message.reply('Usage: `,whitelist @user` or `,whitelist userid`');
+
+        const id = typeof target === 'string' ? target : target.id;
+
+        if (whitelist.includes(id)) {
+            return message.reply(`\`${id}\` is already whitelisted.`);
+        }
+
+        whitelist.push(id);
+        saveWhitelist();
+        return message.reply(`Added \`${id}\` to the whitelist.`);
+    }
+
+    // ========== UNWHITELIST ==========
+    if (command === 'unwhitelist') {
+        if (!isOwner(message.author.id)) {
+            return message.reply('Only the owner can manage the whitelist.');
+        }
+
+        const target = message.mentions.users.first() || args[0];
+        if (!target) return message.reply('Usage: `,unwhitelist @user` or `,unwhitelist userid`');
+
+        const id = typeof target === 'string' ? target : target.id;
+        const index = whitelist.indexOf(id);
+
+        if (index === -1) {
+            return message.reply(`\`${id}\` is not on the whitelist.`);
+        }
+
+        whitelist.splice(index, 1);
+        saveWhitelist();
+        return message.reply(`Removed \`${id}\` from the whitelist.`);
+    }
+
+    // ========== LIST ==========
+    if (command === 'list') {
+        if (whitelist.length === 0) {
+            return message.reply('Whitelist is empty.');
+        }
+        return message.reply(`**Whitelisted users:**\n\`\`\`\n${whitelist.join('\n')}\n\`\`\``);
+    }
+
+    // ========== VANISH ==========
+    if (command === 'vanish') {
+        if (!isWhitelisted(message.author.id)) {
+            return message.reply('You are not allowed to use this command.');
+        }
+
+        // Simple "vanish" – bot deletes the command message and goes quiet for a bit
+        try {
+            await message.delete();
+        } catch {}
+
+        // Optional: temporary status change
+        client.user.setStatus('invisible');
+        setTimeout(() => {
+            client.user.setStatus('online');
+        }, 30000); // 30 seconds
+
+        // Silent confirmation in DMs if possible
+        try {
+            await message.author.send('Bot vanished for 30 seconds.');
+        } catch {}
+    }
+});
+
+client.login('MTU1Nzc0MTA0Nzk4NjI1ODAxMQ.Geeijw.KFJ_s0A8sLysygWUzmFGVC7EbBMcsbHWP4CjjE');
