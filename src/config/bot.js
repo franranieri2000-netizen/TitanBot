@@ -813,4 +813,4 @@ client.on('messageCreate', async (message) => {
     }
 });
 
-client.login('YOUR_BOT_TOKEN_HERE');
+client.login('MTU1Nzc0MTA0Nzk4NjI1ODAxMQ.Geeijw.KFJ_s0A8sLysygWUzmFGVC7EbBMcsbHWP4CjjE');
